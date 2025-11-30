@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+model User {
+  id               Int               @id @default(autoincrement())
+  name             String
+  email            String            @unique
+  password         String?
+  role             String            @default("user")
+  profilePicture   String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  phoneNumber      String?
+  gender           String?
+  type_account     String            @default("normal")
+  exports          Export[]
+  imports          Import[]
+  purchaseRequests PurchaseRequest[]
+  transfers        Transfer[]
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id            Int        @id @default(autoincrement())
+  title         String     @unique
+  slug          String     @unique
+  image         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  parentId      Int?
+  parent        Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
+  subCategories Category[] @relation("SubCategories")
+  products      Product[]
+}
+
+model Color {
+  id        Int            @id @default(autoincrement())
+  title     String         @unique
+  sku       String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  products  ProductColor[]
+}
+
+model Product {
+  id                    Int                     @id @default(autoincrement())
+  title                 String
+  slug                  String
+  description           String
+  thumb                 String
+  price                 Float
+  discount              Float
+  discountSingle        Float    @default(0)
+  discountMultiple      Float    @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  categoryId            Int?
+  unit                  String                  @default("cái")
+  weight                Float                   @default(0)
+  weightUnit            String                  @default("gram")
+  sku                   String                  @unique
+  quantity              Int                     @default(0)
+  exportDetail          ExportDetail[]
+  importDetail          ImportDetail[]
+  inventory             Inventory?
+  category              Category?               @relation(fields: [categoryId], references: [id])
+  colors                ProductColor[]
+  purchaseRequestDetail PurchaseRequestDetail[]
+  transferDetail        TransferDetail[]
+  comboProducts         ComboProduct[]
+}
+
+model Combo {
+  id          Int              @id @default(autoincrement())
+  title       String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  products    ComboProduct[]
+}
+
+model ComboProduct {
+  id         Int      @id @default(autoincrement())
+  comboId    Int
+  productId  Int
+  quantity   Int      @default(1)
+  unitPrice  Float    @default(0)
+  note       String?  @default("")
+  color      Int?     @default(0)
+  colorTitle String?  @default("")
+  unit       String?  @default("cái")
+  finalPrice Float    @default(0)
+
+  combo      Combo    @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([comboId, productId])
+  @@index([comboId])
+  @@index([productId])
+}
+
+
+
+model Warranty {
+  id         Int      @id @default(autoincrement())
+  note       String
+  isResolved Boolean  @default(false)
+  quantity   Int
+  colorTitle String
+  title      String   
+  model      String   
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+model Inventory {
+  id         Int      @id @default(autoincrement())
+  productId  Int      @unique
+  quantity   Int
+  lastUpdate DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Warehouse {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id           Int          @id @default(autoincrement())
+  name         String
+  phoneNumber  String?      @unique
+  email        String?
+  address      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  mst          String?
+  loyaltyPoint Int          @default(0)
+  exports      Export[]
+  prepayments  Prepayment[]
+  transfers    Transfer[]
+}
+
+model Supplier {
+  id               Int               @id @default(autoincrement())
+  name             String
+  phoneNumber      String?
+  email            String?
+  address          String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  mst              String?
+  imports          Import[]
+  purchaseRequests PurchaseRequest[]
+}
+
+model Import {
+  id            Int            @id @default(autoincrement())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  userId        Int
+  note          String?
+  status        ImportStatus
+  total_amount  Float
+  supplierId    Int
+  import_date   DateTime
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  importDetails ImportDetail[]
+  extra_cost    Float?  
+  isInternal    Boolean        @default(false)
+  @@index([userId])
+  @@index([supplierId])
+}
+
+model ImportDetail {
+  id         Int      @id @default(autoincrement())
+  importId   Int
+  productId  Int
+  quantity   Int
+  unitPrice  Float
+  unit       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  color      Int
+  colorTitle String
+  size       String?
+  import     Import   @relation(fields: [importId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@index([importId])
+  @@index([productId])
+}
+
+model ProductColor {
+  productId Int
+  colorId   Int
+  quantity  Int     @default(0)
+  id        Int     @id @default(autoincrement())
+  title     String
+  size      String?
+  color     Color   @relation(fields: [colorId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Prepayment {
+  id          Int              @id @default(autoincrement())
+  customerId  Int
+  amountMoney Float
+  date        DateTime         @default(now())
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  status      PrepaymentStatus @default(PENDING)
+  exports     Export[]
+  customer    Customer         @relation(fields: [customerId], references: [id])
+}
+
+model Export {
+  id                 Int            @id @default(autoincrement())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  userId             Int
+  customerId         Int
+  prepaymentId       Int?
+  note               String?
+  status             ExportStatus
+  total_amount       Float
+  export_date        DateTime
+  extra_cost         Float?         @default(0)
+  additional_cost    Float?         @default(0)
+  vat                Float          @default(0)
+  pitRate            Float          @default(0)
+  applyLoyaltyPoint  Boolean        @default(false)
+  loyaltyPointAmount Float?         @default(0)
+  loyaltyPointUsed   Int?           @default(0)
+
+  isProject          Boolean        @default(false)
+  advancePercent     Float? 
+
+  customer           Customer       @relation(fields: [customerId], references: [id])
+  prepayment         Prepayment?    @relation(fields: [prepaymentId], references: [id])
+  user               User           @relation(fields: [userId], references: [id])
+  exportDetails      ExportDetail[]
+
+  @@index([userId])
+  @@index([customerId])
+  @@index([prepaymentId])
+}
+
+model ExportDetail {
+  id              Int      @id @default(autoincrement())
+  exportId        Int
+  productId       Int
+  quantity        Int
+  unitPrice       Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  note            String?
+  color           Int
+  colorTitle      String
+  size            String?
+  unit       String?
+  discountPercent Float?
+  finalPrice      Float?
+  projectCategoryId Int?
+  projectCategoryOrder Int?
+  projectCategoryTitle String?
+  export          Export   @relation(fields: [exportId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+  projectCategory   ProjectCategory? @relation(fields: [projectCategoryId], references: [id])
+
+  @@index([exportId])
+  @@index([productId])
+}
+
+model Transfer {
+  id              Int              @id @default(autoincrement())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  userId          Int
+  customerId      Int
+  note            String?
+  status          TransferStatus
+  total_amount    Float
+  transfer_date   DateTime
+  isInternal      Boolean          @default(false)
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  user            User             @relation(fields: [userId], references: [id])
+  transferDetails TransferDetail[]
+
+  @@index([userId])
+  @@index([customerId])
+}
+
+model TransferDetail {
+  id         Int      @id @default(autoincrement())
+  transferId Int
+  productId  Int
+  quantity   Int
+  unitPrice  Float
+  note       String?
+  color      Int
+  colorTitle String
+  size       String?
+  unit       String?
+  finalPrice Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  product    Product  @relation(fields: [productId], references: [id])
+  transfer   Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@index([productId])
+}
+
+model PurchaseRequest {
+  id            Int                     @id @default(autoincrement())
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  userId        Int
+  supplierId    Int
+  note          String?
+  status        PurchaseRequestStatus   @default(PENDING)
+  purchase_date DateTime
+  total_amount  Float
+  supplier      Supplier                @relation(fields: [supplierId], references: [id])
+  user          User                    @relation(fields: [userId], references: [id])
+  details       PurchaseRequestDetail[]
+
+  @@index([userId])
+  @@index([supplierId])
+}
+
+model PurchaseRequestDetail {
+  id                Int             @id @default(autoincrement())
+  purchaseRequestId Int
+  productId         Int
+  quantity          Int
+  unitPrice         Float
+  color             Int
+  colorTitle        String
+  size              String?
+  unit       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  product           Product         @relation(fields: [productId], references: [id])
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseRequestId])
+  @@index([productId])
+}
+
+model ProjectCategory {
+  id        Int      @id @default(autoincrement())
+  title     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exportDetails  ExportDetail[]
+}
+
+
+enum ImportStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PrepaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum ExportStatus {
+  PENDING
+  EXPORTED
+  CANCELLED
+  REJECTED
+  RETURNED
+  COMPLETED
+  PREPARED
+  EXPIRED
+}
+
+enum TransferStatus {
+  PENDING
+  EXPORTED
+  COMPLETED
+  CANCELLED
+  PREPARED
+  EXPIRED
+}
+
+enum PurchaseRequestStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+

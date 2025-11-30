@@ -1,0 +1,52 @@
+# Node modules - Thư mục chứa các thư viện phụ thuộc
+node_modules/
+
+# Các thư mục và file build output (nếu có)
+dist/
+build/
+
+# Các tệp môi trường
+.env
+.env.prod
+
+# Các tệp log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tệp cấu hình của IDE hoặc text editor (Visual Studio Code, IntelliJ, ...)
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Các tệp hệ điều hành
+.DS_Store         # MacOS
+Thumbs.db         # Windows
+
+# Các file tạm thời khi debug
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Docker liên quan (nếu sử dụng Docker)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Các file cache
+*.cache
+*.log
+
+# Tệp lưu trữ backup
+*.tar
+*.zip
+*.tar.gz
+
+# Các thư mục tạm thời
+tmp/
+temp/
+
+# Các tệp liên quan đến IDE khác
+*.iml
+*.log

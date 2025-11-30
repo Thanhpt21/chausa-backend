@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "module": "commonjs", // Cấu hình module
+    "declaration": true, // Tạo tệp định nghĩa .d.ts
+    "removeComments": true, // Loại bỏ comment trong tệp JS đã biên dịch
+    "emitDecoratorMetadata": true, // Cần thiết khi sử dụng decorators trong NestJS
+    "experimentalDecorators": true, // Bật hỗ trợ decorators trong TypeScript
+    "allowSyntheticDefaultImports": true, // Hỗ trợ import các module không có `default export`
+    "target": "ES2023", // Cập nhật phiên bản ECMAScript
+    "sourceMap": true, // Tạo source map để dễ debug
+    "rootDir": "./",
+    "outDir": "./dist", // Đầu ra của các tệp JS sau khi biên dịch
+    "baseUrl": "./", // Định nghĩa thư mục gốc của dự án
+    "incremental": true, // Tăng tốc quá trình build bằng cách sử dụng incremental compilation
+    "skipLibCheck": true, // Bỏ qua kiểm tra các thư viện trong node_modules
+    "strictNullChecks": true, // Kiểm tra null/undefined chặt chẽ
+    "forceConsistentCasingInFileNames": true, // Đảm bảo tính nhất quán trong tên tệp
+    "noImplicitAny": false, // Không bắt lỗi khi kiểu `any` xuất hiện
+    "strictBindCallApply": false, // Tắt kiểm tra strict cho bind/call/apply
+    "noFallthroughCasesInSwitch": false, // Tắt kiểm tra lỗi khi fallthrough trong switch
+    "typeRoots": [
+      "./node_modules/@types", // Đường dẫn tới thư mục types chuẩn
+      "./src/types" // Thêm thư mục types của bạn nếu cần thiết
+    ],
+    "moduleResolution": "node", // Cấu hình module resolution
+    "esModuleInterop": true, // Hỗ trợ các module không phải ES6
+    "resolveJsonModule": true // Hỗ trợ import tệp JSON
+  },
+    "include": ["src/**/*", "prisma/**/*", "src/types/**/*.d.ts"],
+  "exclude": [
+    "node_modules", // Loại bỏ node_modules khỏi quá trình biên dịch
+    "dist", // Loại bỏ thư mục dist khỏi quá trình biên dịch
+  ],
+   "types": ["node", "express"],
+}
