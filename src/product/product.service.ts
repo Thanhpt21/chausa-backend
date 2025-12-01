@@ -457,122 +457,151 @@ export class ProductService {
     };
   }
 
-  async findColorQuantityByProductId(productId: number): Promise<{
-    success: boolean;
-    message: string;
-    data: {
-      colorTitle: string;
-      importedQuantity: number;
-      exportedAndTransferredQuantity: number; // Gộp xuất kho và chuyển kho
-      remainingQuantity: number;
-    }[],
-    totalQuantity: number;
-  }> {
-    // 1. Lấy chi tiết nhập kho với trạng thái 'COMPLETED'
-    const importDetails = await this.prisma.importDetail.findMany({
-      where: {
-        productId,
-        import: {
-          status: 'COMPLETED',
-        },
+async findColorQuantityByProductId(productId: number): Promise<{
+  success: boolean;
+  message: string;
+  data: {
+    colorTitle: string;
+    size: string; // 👈 THÊM SIZE
+    importedQuantity: number;
+    exportedAndTransferredQuantity: number;
+    remainingQuantity: number;
+  }[],
+  totalQuantity: number;
+}> {
+  // 1. Lấy chi tiết nhập kho với trạng thái 'COMPLETED' - THÊM SIZE
+  const importDetails = await this.prisma.importDetail.findMany({
+    where: {
+      productId,
+      import: {
+        status: 'COMPLETED',
       },
-      select: {
-        colorTitle: true,
-        quantity: true,
-        color: true
+    },
+    select: {
+      colorTitle: true,
+      size: true, // 👈 THÊM SIZE
+      quantity: true,
+      color: true
+    },
+  });
+
+  // 2. Lấy chi tiết xuất kho với trạng thái 'EXPORTED' - THÊM SIZE
+  const exportDetails = await this.prisma.exportDetail.findMany({
+    where: {
+      productId,
+      export: {
+        status: { in: ['EXPORTED', 'COMPLETED','PREPARED'] },
       },
-    });
+    },
+    select: {
+      colorTitle: true,
+      size: true, // 👈 THÊM SIZE
+      quantity: true,
+      color: true
+    },
+  });
 
-    // 2. Lấy chi tiết xuất kho với trạng thái 'EXPORTED'
-    const exportDetails = await this.prisma.exportDetail.findMany({
-      where: {
-        productId,
-        export: {
-          status: { in: ['EXPORTED', 'COMPLETED','PREPARED'] }, // Chỉ lấy các bản ghi có trạng thái 'EXPORTED'
-        },
+  // 3. Lấy chi tiết chuyển kho với trạng thái 'COMPLETED' - THÊM SIZE
+  const transferDetails = await this.prisma.transferDetail.findMany({
+    where: {
+      productId,
+      transfer: {
+        status: { in: ['EXPORTED', 'COMPLETED'] },
       },
-      select: {
-        colorTitle: true,
-        quantity: true,
-        color: true
-      },
-    });
+    },
+    select: {
+      colorTitle: true,
+      size: true, // 👈 THÊM SIZE
+      quantity: true,
+      color: true
+    },
+  });
 
-    // 3. Lấy chi tiết chuyển kho với trạng thái 'COMPLETED'
-    const transferDetails = await this.prisma.transferDetail.findMany({
-      where: {
-        productId,
-        transfer: {
-          status: { in: ['EXPORTED', 'COMPLETED'] }, // Chỉ lấy các bản ghi có trạng thái 'COMPLETED'
-        },
-      },
-      select: {
-        colorTitle: true,
-        quantity: true,
-        color: true
-      },
-    });
+  // 4. Tính tổng số lượng nhập theo từng màu VÀ SIZE
+  const importResult = importDetails.reduce<{ 
+    colorTitle: string; 
+    size: string; // 👈 THÊM SIZE
+    quantity: number; 
+    color: number 
+  }[]>((acc, { colorTitle, size, quantity, color }) => {
+    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
+    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
+    }
+    return acc;
+  }, []);
 
-    // 4. Tính tổng số lượng nhập theo từng màu
-    const importResult = importDetails.reduce<{ colorTitle: string; quantity: number; color: number }[]>((acc, { colorTitle, quantity, color }) => {
-      const existing = acc.find(item => item.colorTitle === colorTitle);
-      if (existing) {
-        existing.quantity += quantity; // Cộng dồn số lượng nhập cùng màu
-      } else {
-        acc.push({ colorTitle, quantity, color });
-      }
-      return acc;
-    }, []);
+  // 5. Tính tổng số lượng xuất theo từng màu VÀ SIZE
+  const exportResult = exportDetails.reduce<{ 
+    colorTitle: string; 
+    size: string; // 👈 THÊM SIZE
+    quantity: number; 
+    color: number 
+  }[]>((acc, { colorTitle, size, quantity, color }) => {
+    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
+    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
+    }
+    return acc;
+  }, []);
 
-    // 5. Tính tổng số lượng xuất theo từng màu
-    const exportResult = exportDetails.reduce<{ colorTitle: string; quantity: number; color: number }[]>((acc, { colorTitle, quantity, color }) => {
-      const existing = acc.find(item => item.colorTitle === colorTitle);
-      if (existing) {
-        existing.quantity += quantity; // Cộng dồn số lượng xuất cùng màu
-      } else {
-        acc.push({ colorTitle, quantity, color });
-      }
-      return acc;
-    }, []);
+  // 6. Tính tổng số lượng chuyển kho theo từng màu VÀ SIZE
+  const transferResult = transferDetails.reduce<{ 
+    colorTitle: string; 
+    size: string; // 👈 THÊM SIZE
+    quantity: number; 
+    color: number 
+  }[]>((acc, { colorTitle, size, quantity, color }) => {
+    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
+    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
+    }
+    return acc;
+  }, []);
 
-    // 6. Tính tổng số lượng chuyển kho theo từng màu
-    const transferResult = transferDetails.reduce<{ colorTitle: string; quantity: number; color: number }[]>((acc, { colorTitle, quantity, color }) => {
-      const existing = acc.find(item => item.colorTitle === colorTitle);
-      if (existing) {
-        existing.quantity += quantity; // Cộng dồn số lượng chuyển kho cùng màu
-      } else {
-        acc.push({ colorTitle, quantity, color });
-      }
-      return acc;
-    }, []);
+  // 7. Kết hợp kết quả nhập, xuất và chuyển kho THEO MÀU + SIZE
+  const combinedResult = importResult.map(importItem => {
+    const key = `${importItem.colorTitle}-${importItem.size}`;
+    
+    const exportItem = exportResult.find(exportItem => 
+      `${exportItem.colorTitle}-${exportItem.size}` === key
+    ) || { colorTitle: importItem.colorTitle, size: importItem.size, quantity: 0 };
+    
+    const transferItem = transferResult.find(transferItem => 
+      `${transferItem.colorTitle}-${transferItem.size}` === key
+    ) || { colorTitle: importItem.colorTitle, size: importItem.size, quantity: 0 };
 
-    // 7. Kết hợp kết quả nhập, xuất và chuyển kho
-    const combinedResult = importResult.map(importItem => {
-      const exportItem = exportResult.find(exportItem => exportItem.colorTitle === importItem.colorTitle) || { colorTitle: importItem.colorTitle, quantity: 0 };
-      const transferItem = transferResult.find(transferItem => transferItem.colorTitle === importItem.colorTitle) || { colorTitle: importItem.colorTitle, quantity: 0 };
-
-      // Gộp xuất kho và chuyển kho
-      const exportedAndTransferredQuantity = exportItem.quantity + transferItem.quantity;
-
-      return {
-        color: importItem.color,
-        colorTitle: importItem.colorTitle,
-        importedQuantity: importItem.quantity,
-        exportedAndTransferredQuantity, // Số lượng xuất kho và chuyển kho gộp lại
-        remainingQuantity: importItem.quantity - exportedAndTransferredQuantity, // Tính số lượng còn lại
-      };
-    });
-
-    // 8. Tính tổng số lượng nhập
-    const totalQuantity = combinedResult.reduce((sum, { importedQuantity }) => sum + importedQuantity, 0);
+    const exportedAndTransferredQuantity = exportItem.quantity + transferItem.quantity;
 
     return {
-      success: true,
-      message: combinedResult.length > 0 ? 'Lấy danh sách màu và số lượng thành công' : 'Không có chi tiết màu nào cho sản phẩm này',
-      data: combinedResult,
-      totalQuantity, // Tổng số lượng nhập
+      color: importItem.color,
+      colorTitle: importItem.colorTitle,
+      size: importItem.size, // 👈 THÊM SIZE VÀO KẾT QUẢ
+      importedQuantity: importItem.quantity,
+      exportedAndTransferredQuantity,
+      remainingQuantity: importItem.quantity - exportedAndTransferredQuantity,
     };
-  }
+  });
+
+  // 8. Tính tổng số lượng nhập
+  const totalQuantity = combinedResult.reduce((sum, { importedQuantity }) => sum + importedQuantity, 0);
+
+  return {
+    success: true,
+    message: combinedResult.length > 0 ? 'Lấy danh sách màu và số lượng thành công' : 'Không có chi tiết màu nào cho sản phẩm này',
+    data: combinedResult,
+    totalQuantity,
+  };
+}
 
   async calculateStock(id: number) {
     // 1. Tính tổng số lượng nhập (chỉ tính import.status = 'COMPLETED')
