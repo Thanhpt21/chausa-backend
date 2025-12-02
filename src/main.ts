@@ -30,9 +30,6 @@ async function bootstrap() {
     },
   }));
 
-  // app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-  //   prefix: '/uploads/', // Truy cập ảnh qua: http://localhost:3000/uploads/...
-  // });
 
 
 

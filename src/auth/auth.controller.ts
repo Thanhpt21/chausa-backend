@@ -11,30 +11,31 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 export class AuthController {
   constructor(private authService: AuthService, private configService: ConfigService) {}
 
-  @Post('login')
-  async login(
-    @Res({ passthrough: true }) res: Response,
-    @Body() body: { email: string; password: string },
-  ) {
-    const user = await this.authService.validateUser(body.email, body.password);
-    const { access_token, user: userData, ...rest } = await this.authService.login(user);
+@Post('login')
+async login(
+  @Res({ passthrough: true }) res: Response,
+  @Body() body: { email: string; password: string },
+) {
+  const user = await this.authService.validateUser(body.email, body.password);
+  const { access_token, user: userData } = await this.authService.login(user);
 
-    const isProduction = this.configService.get('NODE_ENV') === 'production';
+  // VẪN set cookie cho những trường hợp khác (tùy chọn)
+  res.cookie('accessToken', access_token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+    path: '/',
+  });
 
-
-    res.cookie('accessToken', access_token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-      path: '/',
-    });
-
-    return {
-      ...rest,
-      user: userData,
-    };
-  }
+  // QUAN TRỌNG: Trả token trong response để frontend lưu vào localStorage
+  return {
+    success: true,
+    message: 'Login successful',
+    access_token, // <-- THÊM DÒNG NÀY
+    user: userData,
+  };
+}
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
