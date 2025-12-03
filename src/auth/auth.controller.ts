@@ -11,31 +11,26 @@ import { LoginDto } from './dto/login.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService, private configService: ConfigService) {}
+  
+@Post('login')
+async login(
+  @Body() dto: LoginDto,
+  @Res({ passthrough: true }) res: Response,
+) {
+  const user = await this.authService.validateUser(dto.email, dto.password);
+  const result = await this.authService.login(user);
+  const { access_token, user: userData } = result;
 
-  @Post('login')
-  async login(
-    @Body() dto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const user = await this.authService.validateUser(dto.email, dto.password);
-    const result = await this.authService.login(user);
-    const { access_token, user: userData } = result;
+  res.cookie('accessToken', access_token, {
+    httpOnly: true,
+    secure: true, // Bắt buộc true trong production
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 ngày
+    sameSite: 'strict', // Hoặc 'none' nếu cross-domain
+    path: '/',
+  });
 
-    // Cấu hình cho localhost
-    const isLocalhost = process.env.NODE_ENV !== 'production';
-    
-    res.cookie('accessToken', access_token, {
-      httpOnly: true, // Vẫn giữ httpOnly cho bảo mật
-      secure: false,   // QUAN TRỌNG: Đặt false cho localhost
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 ngày
-      sameSite: 'lax',
-      path: '/',
-      domain: isLocalhost ? 'localhost' : undefined, // Thêm domain cho localhost
-    });
-
-    return { user: userData, access_token };
-  }
-
+  return { user: userData, access_token };
+}
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
