@@ -81,12 +81,18 @@ export class UsersService {
 
 
 
-  // user theo id
-  // k dc sửa gì 
   async getUserById(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new UnauthorizedException('User not found');
-    return user;
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return {
+      success: true,
+      message: 'Lấy thông tin người dùng thành công',
+      data: new UserResponseDto(user),
+    };
   }
 
 

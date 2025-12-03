@@ -1,5 +1,5 @@
 // src/users/users.controller.ts
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Query, UseInterceptors, UploadedFile, ParseIntPipe } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -33,10 +33,13 @@ export class UsersController {
     return await this.usersService.getUsers(+page, +limit, search);
   }
 
+  // Lấy user theo id
   @Get(':id')
-  async getUserById(@Param('id') id: string) {
-    return await this.usersService.getUserById(+id);
+  // @Permissions('get_a_users')
+  async getUserById(@Param('id', ParseIntPipe) id: number) {
+    return await this.usersService.getUserById(id);
   }
+
 
   // ✅ Cập nhật user
   @Put(':id')

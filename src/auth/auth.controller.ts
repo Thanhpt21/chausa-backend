@@ -6,36 +6,36 @@ import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth/jwt-auth.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService, private configService: ConfigService) {}
 
-@Post('login')
-async login(
-  @Res({ passthrough: true }) res: Response,
-  @Body() body: { email: string; password: string },
-) {
-  const user = await this.authService.validateUser(body.email, body.password);
-  const { access_token, user: userData } = await this.authService.login(user);
+  @Post('login')
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = await this.authService.validateUser(dto.email, dto.password);
+    const result = await this.authService.login(user);
+    const { access_token, user: userData } = result;
 
-  // VẪN set cookie cho những trường hợp khác (tùy chọn)
-  res.cookie('accessToken', access_token, {
-    httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-    path: '/',
-  });
+    // Cấu hình cho localhost
+    const isLocalhost = process.env.NODE_ENV !== 'production';
+    
+    res.cookie('accessToken', access_token, {
+      httpOnly: true, // Vẫn giữ httpOnly cho bảo mật
+      secure: false,   // QUAN TRỌNG: Đặt false cho localhost
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 ngày
+      sameSite: 'lax',
+      path: '/',
+      domain: isLocalhost ? 'localhost' : undefined, // Thêm domain cho localhost
+    });
 
-  // QUAN TRỌNG: Trả token trong response để frontend lưu vào localStorage
-  return {
-    success: true,
-    message: 'Login successful',
-    access_token, // <-- THÊM DÒNG NÀY
-    user: userData,
-  };
-}
+    return { user: userData, access_token };
+  }
+
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
@@ -54,18 +54,11 @@ async login(
 
   @Get('current')
   @UseGuards(JwtAuthGuard)
-  // Thay đổi kiểu của user thành any
-  getCurrentUser(@CurrentUser() user: any) {
+  async getCurrentUser(@CurrentUser() user: any) {
     return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      phoneNumber: user.phoneNumber,
-      profilePicture: user.profilePicture,
-      gender: user.gender,
-      type_account: user.type_account,
-      isActive: user.isActive,
+      success: true,
+      message: 'Lấy thông tin người dùng thành công',
+      data: user,
     };
   }
 

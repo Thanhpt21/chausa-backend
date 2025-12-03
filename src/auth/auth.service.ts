@@ -83,7 +83,7 @@ export class AuthService {
     async register(dto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const user = await this.usersService.createUser({
+    const result = await this.usersService.createUser({
         ...dto,
         password: hashedPassword,
         role: dto.role || 'customer',
@@ -93,7 +93,7 @@ export class AuthService {
     return {
       success: true,
       message: 'User registered successfully',
-      data: new UserResponseDto(user),
+      data: result.data,
     };
   }
 
