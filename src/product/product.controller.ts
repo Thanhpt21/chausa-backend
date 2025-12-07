@@ -14,15 +14,20 @@ import {
   UsePipes,
   ValidationPipe,
   NotFoundException,
+  Req,
+  UploadedFile,
+  Res,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/users/enums/user.enums';
+import { Response } from 'express';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +35,8 @@ import { UserRole } from 'src/users/enums/user.enums';
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+
+  
   @Post()
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -142,6 +149,34 @@ export class ProductController {
     }
 
     return colors;
+  }
+
+   @Post('import')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async import(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.productService.importProducts(file);
+  }
+
+  // =============== EXPORT PRODUCTS ===============
+   @Get('export/excel')
+  @UseGuards(JwtAuthGuard)
+  async export(@Res() res: Response) {
+    const result = await this.productService.exportProducts();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${result.data.fileName}`);
+    res.send(result.data.buffer);
+  }
+
+  // =============== EXPORT TEMPLATE ===============
+   @Get('export/template')
+  async exportTemplate(@Res() res: Response) {
+    const result = await this.productService.exportTemplate();
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${result.data.fileName}`);
+    res.send(result.data.buffer);
   }
 
 

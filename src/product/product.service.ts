@@ -12,6 +12,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { Prisma } from '@prisma/client';
 import slugify from 'slugify';
 import { extractPublicId } from 'src/utils/file.util';
+import { Response } from 'express';
+import * as XLSX from 'xlsx';
 import { validate, ValidationError } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { ProductSizeDetail } from 'src/types/product.type';
@@ -737,6 +739,250 @@ async findColorQuantityByProductId(productId: number): Promise<{
       data: overExportedProducts,
     };
 }
+
+
+  async importProducts(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('File không được tìm thấy');
+    }
+
+    try {
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+
+      const results = {
+        total: data.length,
+        success: 0,
+        errors: [] as string[],
+        details: [] as any[]
+      };
+
+      // Lấy tất cả SKU hiện có để check trùng
+      const existingProducts = await this.prisma.product.findMany({
+        select: { sku: true }
+      });
+      const existingSkus = new Set(existingProducts.map(p => p.sku.toLowerCase().trim()));
+
+      for (const [index, row] of data.entries()) {
+        try {
+          const rowData = row as Record<string, any>;
+          
+          // CHỈ 3 FIELD: Tên Sản Phẩm, SKU, Giá
+          const productData = {
+            title: String(rowData['Tên Sản Phẩm'] || '').trim(),
+            sku: String(rowData['SKU'] || '').trim(),
+            price: this.parseNumber(rowData['Giá'] || 0),
+          };
+
+          // Validate required fields
+          if (!productData.title) {
+            throw new Error('Tên sản phẩm là bắt buộc');
+          }
+          if (!productData.sku) {
+            throw new Error('SKU là bắt buộc');
+          }
+          if (productData.price === undefined || productData.price < 0) {
+            throw new Error('Giá sản phẩm không hợp lệ');
+          }
+
+          // Check trùng SKU
+          const normalizedSku = productData.sku.toLowerCase().trim();
+          if (existingSkus.has(normalizedSku)) {
+            throw new Error(`SKU "${productData.sku}" đã tồn tại`);
+          }
+
+          // Tạo slug từ title
+          const slug = this.createSlug(productData.title);
+
+          // Create product
+          await this.prisma.product.create({
+            data: {
+              title: productData.title,
+              sku: productData.sku,
+              price: productData.price,
+              slug: slug,
+              description: '',
+              thumb: '',
+              discount: 0,
+              discountSingle: 0,
+              discountMultiple: 0,
+              unit: 'cái',
+              weight: 0,
+              weightUnit: 'gram',
+              quantity: 0,
+            }
+          });
+
+          // Thêm vào set để tránh trùng trong cùng 1 file import
+          existingSkus.add(normalizedSku);
+          
+          results.success++;
+          results.details.push({
+            row: index + 2,
+            name: productData.title,
+            sku: productData.sku,
+            price: productData.price,
+            status: 'SUCCESS'
+          });
+
+        } catch (error: any) {
+          const rowNumber = index + 2;
+          const errorMessage = `Dòng ${rowNumber}: ${error.message}`;
+          
+          results.errors.push(errorMessage);
+          results.details.push({
+            row: rowNumber,
+            name: String((row as any)?.['Tên Sản Phẩm'] || 'N/A'),
+            status: 'ERROR',
+            message: error.message
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: `Import hoàn tất: ${results.success}/${results.total} sản phẩm thành công`,
+        data: results
+      };
+
+    } catch (error: any) {
+      throw new BadRequestException('Lỗi khi xử lý file Excel: ' + error.message);
+    }
+  }
+
+  // =============== 2. EXPORT PRODUCTS (3 FIELD) ===============
+  async exportProducts() {
+    try {
+      // Lấy tất cả sản phẩm từ database
+      const products = await this.prisma.product.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          title: true,
+          sku: true,
+          price: true,
+        },
+      });
+
+      // Format data để export
+      const exportData = products.map(product => ({
+        'Tên Sản Phẩm': product.title || '',
+        'SKU': product.sku || '',
+        'Giá': product.price, // Giữ số để tính toán
+      }));
+
+      // Tạo worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sản phẩm');
+
+      // Định dạng độ rộng cột
+      const colWidths = [
+        { wch: 40 },   // Tên Sản Phẩm
+        { wch: 25 },   // SKU
+        { wch: 15 },   // Giá
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      return {
+        success: true,
+        message: 'Export danh sách sản phẩm thành công',
+        data: {
+          buffer: buffer,
+          fileName: `products_export_${new Date().toISOString().split('T')[0]}.xlsx`
+        }
+      };
+    } catch (error: any) {
+      this.logger.error('Lỗi khi export Excel:', error);
+      throw new InternalServerErrorException('Lỗi khi xuất file Excel: ' + error.message);
+    }
+  }
+
+  // =============== 3. EXPORT TEMPLATE ===============
+  async exportTemplate() {
+    try {
+      // Tạo template với 3 cột mẫu
+      const templateData = [
+        {
+          'Tên Sản Phẩm': 'Áo thun nam cổ tròn',
+          'SKU': 'ATHUN001',
+          'Giá': 150000,
+        },
+        {
+          'Tên Sản Phẩm': 'Quần jean nam',
+          'SKU': 'QJEAN001',
+          'Giá': 350000,
+        },
+        {
+          'Tên Sản Phẩm': 'Găng tay thể thao',
+          'SKU': 'GANTAY001',
+          'Giá': 20000,
+        }
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(templateData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+
+      // Định dạng độ rộng cột
+      const colWidths = [
+        { wch: 30 }, // Tên Sản Phẩm
+        { wch: 20 }, // SKU
+        { wch: 15 }, // Giá
+      ];
+      worksheet['!cols'] = colWidths;
+
+     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      return {
+        success: true,
+        message: 'Export template thành công',
+        data: {
+          buffer: buffer,
+          fileName: 'product_import_template.xlsx'
+        }
+      };
+
+    } catch (error: any) {
+      this.logger.error('Lỗi khi export template:', error);
+      throw new InternalServerErrorException('Lỗi khi xuất template: ' + error.message);
+    }
+  }
+
+  // =============== HELPER FUNCTIONS ===============
+  private parseNumber(value: any): number {
+    if (value === null || value === undefined || value === '') return 0;
+    
+    // Nếu đã là số
+    if (typeof value === 'number') return value;
+    
+    const strValue = String(value);
+    
+    // Xử lý string: xóa khoảng trắng, ký tự đặc biệt, chuyển dấu phẩy thành chấm
+    const cleaned = strValue
+      .replace(/\s+/g, '')
+      .replace(/[^0-9.,-]/g, '')
+      .replace(/,/g, '.');
+    
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : Math.abs(num); // Luôn dương
+  }
+
+  private createSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+
+
 
 
 
