@@ -30,6 +30,8 @@ import { ProjectCategoryModule } from './project-category/project-category.modul
 import { WarrantyModule } from './warranty/warranty.module';
 import { ComboModule } from './combo/combo.module';
 import { ProductComboModule } from './product-combo/product-combo.module';
+import { EmployeeModule } from './employee/employee.module';
+import { SalaryModule } from './salary/salary.module';
 
 @Module({
   imports: [
@@ -62,6 +64,8 @@ import { ProductComboModule } from './product-combo/product-combo.module';
     WarrantyModule,
     ComboModule,
     ProductComboModule,
+    EmployeeModule,
+    SalaryModule
   ],
   controllers: [AppController, TransferController],
   providers: [AppService, PrismaService, JwtStrategy, TransferService],

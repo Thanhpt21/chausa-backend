@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Color" ALTER COLUMN "sku" DROP NOT NULL;

@@ -5,8 +5,7 @@ export class CreateColorDto {
   @IsNotEmpty()
   title: string; // Tên màu, không được để trống và phải là chuỗi
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  sku: string; // Mã SKU của màu sắc, không được để trống và phải là chuỗi
-
+  sku?: string | null;
 }

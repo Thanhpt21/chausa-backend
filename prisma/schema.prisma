@@ -50,7 +50,7 @@ model Category {
 model Color {
   id        Int            @id @default(autoincrement())
   title     String         @unique
-  sku       String
+  sku       String?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   products  ProductColor[]
@@ -376,6 +376,70 @@ model ProjectCategory {
   updatedAt DateTime @updatedAt
 
   exportDetails  ExportDetail[]
+}
+
+model Employee {
+  id               Int       @id @default(autoincrement())
+  name             String    // Tên nhân viên
+  phone            String?   // Số điện thoại
+  email            String?   // Email
+  position         String?    // Chức vụ
+  department       String?    // Phòng ban
+  baseSalary       Float     // Lương cơ bản/tháng
+  salaryCurrency   String    @default("VND") // Đơn vị tiền tệ
+  startDate        DateTime  // Ngày bắt đầu làm việc
+  isActive         Boolean   @default(true) // Đang làm việc
+  bankName         String?   // Tên ngân hàng
+  bankAccount      String?   // Số tài khoản ngân hàng
+  bankAccountName  String?   // Tên chủ tài khoản
+  note             String?   // Ghi chú
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  salaries Salary[] // Quan hệ 1-n với bảng lương
+  
+  @@index([name])
+  @@index([department])
+  @@index([isActive])
+}
+
+model Salary {
+  id                Int          @id @default(autoincrement())
+  employeeId        Int          // ID nhân viên
+  month             Int          // Tháng (1-12)
+  year              Int          // Năm
+  baseSalary        Float        // Lương cơ bản
+  actualWorkDays    Int          // Số ngày làm việc thực tế
+  totalWorkHours    Float        @default(0) // Tổng số giờ làm việc
+  overtimeHours     Float        @default(0) // Số giờ tăng ca
+  overtimeAmount    Float        @default(0) // Tiền tăng ca
+  leaveDays         Int          @default(0) // Số ngày nghỉ
+  leaveHours        Float        @default(0) // Số giờ nghỉ
+  bonus             Float        @default(0) // Thưởng
+  deduction         Float        @default(0) // Khấu trừ
+  allowance         Float        @default(0) // Phụ cấp
+  netSalary         Float        // Lương thực nhận
+  status            SalaryStatus @default(PENDING) // Trạng thái
+  paymentDate       DateTime?    // Ngày thanh toán
+  notes             String?      // Ghi chú
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  employee          Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
+  @@index([status])
+  @@index([paymentDate])
+}
+
+enum SalaryStatus {
+  PENDING     
+  CALCULATED   
+  APPROVED    
+  PAID         
+  CANCELLED    
 }
 
 
