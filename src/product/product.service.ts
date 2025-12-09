@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -28,12 +29,23 @@ export class ProductService {
   ) {}
 
   // Tạo sản phẩm mới với thumb và images
-  async create(
+async create(
     dto: CreateProductDto,
     files: { thumb?: Express.Multer.File[]; images?: Express.Multer.File[] },
   ) {
     if (!dto.title || typeof dto.title !== 'string') {
       throw new BadRequestException('Tiêu đề sản phẩm là bắt buộc và phải là chuỗi.');
+    }
+
+    // 👈 KIỂM TRA SKU ĐÃ TỒN TẠI CHƯA
+    if (dto.sku) {
+      const existingProduct = await this.prisma.product.findFirst({
+        where: { sku: dto.sku },
+      });
+      
+      if (existingProduct) {
+        throw new ConflictException(`Mã sản phẩm "${dto.sku}" đã tồn tại trong hệ thống. Vui lòng sử dụng mã khác.`);
+      }
     }
 
     const slug = slugify(dto.title, { lower: true });
