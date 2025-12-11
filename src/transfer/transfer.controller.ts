@@ -36,14 +36,24 @@ export class TransferController {
 
   // Lấy danh sách phiếu chuyển kho
   @Get()
-  findAll(
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
+  async findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('startDate') startDate?: string,  // Thêm
+    @Query('endDate') endDate?: string,      // Thêm
   ) {
-    return this.transferService.findAll(+page, +limit, status, search);
+    return this.transferService.findAll(
+      page,
+      limit,
+      status,
+      search,
+      startDate,
+      endDate,
+    );
   }
+
 
   
   @Get('stats')

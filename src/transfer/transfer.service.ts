@@ -31,18 +31,39 @@ export class TransferService {
     };
   }
 
-  // Lấy danh sách phiếu transfer
+// Lấy danh sách phiếu transfer
   async findAll(
     page = 1,
     limit = 10,
     status?: string,
     search?: string,
+    startDate?: string,  // Thêm startDate
+    endDate?: string,    // Thêm endDate
   ) {
     const skip = (page - 1) * limit;
 
     const statusEnum = status && Object.values(TransferStatus).includes(status as TransferStatus)
       ? (status as TransferStatus)
       : undefined;
+
+    // Xử lý date range
+    let dateFilter = {};
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+      
+      // Đảm bảo endDate bao gồm cả ngày cuối (23:59:59)
+      if (end) {
+        end.setHours(23, 59, 59, 999);
+      }
+
+      dateFilter = {
+        AND: [
+          ...(start ? [{ createdAt: { gte: start } }] : []),
+          ...(end ? [{ createdAt: { lte: end } }] : []),
+        ],
+      };
+    }
 
     const whereClause: Prisma.TransferWhereInput = {
       ...(statusEnum && { status: statusEnum }),
@@ -52,6 +73,7 @@ export class TransferService {
           { customer: { name: { contains: search, mode: 'insensitive' } } },
         ],
       }),
+      ...(Object.keys(dateFilter).length > 0 && dateFilter), // Thêm date filter
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -90,6 +112,12 @@ export class TransferService {
       total,
       page,
       pageCount: Math.ceil(total / limit),
+      filters: { // Trả về thông tin filter để frontend biết
+        status,
+        search,
+        startDate,
+        endDate,
+      },
     };
   }
 
