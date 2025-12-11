@@ -29,11 +29,6 @@ Thumbs.db         # Windows
 *.bak
 *.tmp
 
-# Docker liên quan (nếu sử dụng Docker)
-Dockerfile
-docker-compose.yml
-.dockerignore
-
 # Các file cache
 *.cache
 *.log
