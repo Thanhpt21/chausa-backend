@@ -91,23 +91,7 @@ export class ProductController {
     );
   }
 
-  @Get('low-stock')
-  async findLowStockProducts(
-    @Query('threshold', ParseIntPipe) threshold: number,
-  ) {
-    return this.productService.findLowStockProducts(threshold);
-  }
-
   
-  @Get('stock/:productId')
-  async findColorQuantityByProductId(@Param('productId') productId: number) {
-    return this.productService.findColorQuantityByProductId(productId);
-  }
-
-  @Get('over-exported')
-  async findProductsOverExported() {
-    return this.productService.findProductsOverExported();
-  }
 
 
    @Get(':id/stock')

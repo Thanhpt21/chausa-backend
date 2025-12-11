@@ -213,67 +213,6 @@ async create(
     };
   }
 
-  async findLowStockProducts(threshold: number) {
-    if (threshold === undefined || isNaN(threshold)) {
-      throw new Error('Thiếu hoặc sai kiểu tham số threshold');
-    }
-
-    // Lấy danh sách sản phẩm
-    const products = await this.prisma.product.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        quantity: true,
-        sku: true,
-        colors: true,
-        price: true,
-        discount: true,
-      },
-    });
-
-    // Xử lý song song lấy tồn kho chi tiết, tính toán và lọc sản phẩm tồn kho thấp theo màu
-    const lowStockProducts = (await Promise.all(
-      products.map(async (product) => {
-        const stockInfo = await this.findColorQuantityByProductId(product.id);
-
-        // Lọc màu có tồn kho thấp hơn threshold
-        const lowStockColors = stockInfo.data.filter(
-          (item) => item.remainingQuantity < threshold
-        );
-
-        if (lowStockColors.length > 0) {
-          const totalExportedAndTransferred = lowStockColors.reduce(
-            (sum, item) => sum + item.exportedAndTransferredQuantity,
-            0
-          );
-
-          const totalRemaining = lowStockColors.reduce(
-            (sum, item) => sum + item.remainingQuantity,
-            0
-          );
-
-          return {
-            ...product,
-            stockByColor: lowStockColors,
-            totalImported: stockInfo.totalQuantity,
-            totalExportedAndTransferred,
-            totalRemaining,
-          };
-        }
-        return null; // Không có màu nào tồn kho thấp => bỏ sản phẩm
-      })
-    )).filter((product) => product !== null);
-
-    return {
-      success: true,
-      message:
-        lowStockProducts.length > 0
-          ? `Danh sách sản phẩm tồn kho thấp hơn ${threshold}`
-          : `Không có sản phẩm nào tồn kho thấp hơn ${threshold}`,
-      data: lowStockProducts,
-    };
-  }
 
 
   async findAll(
@@ -328,69 +267,50 @@ async create(
   }
 
 
-  async findAllWithoutPagination(search = '', categoryId?: number) {
-    const whereClause: Prisma.ProductWhereInput = search
-      ? {
-          OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { slug: { contains: search, mode: 'insensitive' } },
-          ],
-        }
-      : {};
+async findAllWithoutPagination(search = '', categoryId?: number) {
+  const whereClause: Prisma.ProductWhereInput = search
+    ? {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { slug: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : {};
 
-    if (categoryId) {
-      whereClause.categoryId = Number(categoryId);
-    }
-
-    const products = await this.prisma.product.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        quantity: true,
-        sku: true,
-        colors: true,
-        price: true,
-        discount: true,
-        discountSingle: true,
-        discountMultiple: true,
-        unit: true
-      },
-    });
-
-    // Gọi tồn kho chi tiết cho từng sản phẩm
-    const productsWithStock = await Promise.all(
-      products.map(async (product) => {
-        const stockInfo = await this.findColorQuantityByProductId(product.id);
-
-        const totalExportedAndTransferred = stockInfo.data.reduce(
-          (sum, item) => sum + item.exportedAndTransferredQuantity,
-          0
-        );
-
-        const totalRemaining = stockInfo.data.reduce(
-          (sum, item) => sum + item.remainingQuantity,
-          0
-        );
-
-        return {
-          ...product,
-          stockByColor: stockInfo.data,
-          totalImported: stockInfo.totalQuantity,
-          totalExportedAndTransferred,
-          totalRemaining,
-        };
-      })
-    );
-
-    return {
-      success: true,
-      message: productsWithStock.length > 0 ? 'Lấy sản phẩm thành công' : 'Không tìm thấy sản phẩm',
-      data: productsWithStock,
-    };
+  if (categoryId) {
+    whereClause.categoryId = Number(categoryId);
   }
 
+  // Chỉ query sản phẩm cơ bản, KHÔNG query stock
+  const products = await this.prisma.product.findMany({
+    where: whereClause,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      sku: true,
+      price: true,
+      discount: true,
+      discountSingle: true,
+      discountMultiple: true,
+      unit: true,
+      // Thêm category nếu cần
+      category: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  return {
+    success: true,
+    message: products.length > 0 ? 'Lấy sản phẩm thành công' : 'Không tìm thấy sản phẩm',
+    data: products, // Không có stock data
+    total: products.length,
+  };
+}
 
   async findOne(id: number) {
     const product = await this.prisma.product.findUnique({
@@ -444,151 +364,6 @@ async create(
     };
   }
 
-async findColorQuantityByProductId(productId: number): Promise<{
-  success: boolean;
-  message: string;
-  data: {
-    colorTitle: string;
-    size: string; // 👈 THÊM SIZE
-    importedQuantity: number;
-    exportedAndTransferredQuantity: number;
-    remainingQuantity: number;
-  }[],
-  totalQuantity: number;
-}> {
-  // 1. Lấy chi tiết nhập kho với trạng thái 'COMPLETED' - THÊM SIZE
-  const importDetails = await this.prisma.importDetail.findMany({
-    where: {
-      productId,
-      import: {
-        status: 'COMPLETED',
-      },
-    },
-    select: {
-      colorTitle: true,
-      size: true, // 👈 THÊM SIZE
-      quantity: true,
-      color: true
-    },
-  });
-
-  // 2. Lấy chi tiết xuất kho với trạng thái 'EXPORTED' - THÊM SIZE
-  const exportDetails = await this.prisma.exportDetail.findMany({
-    where: {
-      productId,
-      export: {
-        status: { in: ['EXPORTED', 'COMPLETED','PREPARED'] },
-      },
-    },
-    select: {
-      colorTitle: true,
-      size: true, // 👈 THÊM SIZE
-      quantity: true,
-      color: true
-    },
-  });
-
-  // 3. Lấy chi tiết chuyển kho với trạng thái 'COMPLETED' - THÊM SIZE
-  const transferDetails = await this.prisma.transferDetail.findMany({
-    where: {
-      productId,
-      transfer: {
-        status: { in: ['EXPORTED', 'COMPLETED'] },
-      },
-    },
-    select: {
-      colorTitle: true,
-      size: true, // 👈 THÊM SIZE
-      quantity: true,
-      color: true
-    },
-  });
-
-  // 4. Tính tổng số lượng nhập theo từng màu VÀ SIZE
-  const importResult = importDetails.reduce<{ 
-    colorTitle: string; 
-    size: string; // 👈 THÊM SIZE
-    quantity: number; 
-    color: number 
-  }[]>((acc, { colorTitle, size, quantity, color }) => {
-    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
-    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
-    }
-    return acc;
-  }, []);
-
-  // 5. Tính tổng số lượng xuất theo từng màu VÀ SIZE
-  const exportResult = exportDetails.reduce<{ 
-    colorTitle: string; 
-    size: string; // 👈 THÊM SIZE
-    quantity: number; 
-    color: number 
-  }[]>((acc, { colorTitle, size, quantity, color }) => {
-    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
-    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
-    }
-    return acc;
-  }, []);
-
-  // 6. Tính tổng số lượng chuyển kho theo từng màu VÀ SIZE
-  const transferResult = transferDetails.reduce<{ 
-    colorTitle: string; 
-    size: string; // 👈 THÊM SIZE
-    quantity: number; 
-    color: number 
-  }[]>((acc, { colorTitle, size, quantity, color }) => {
-    const key = `${colorTitle}-${size}`; // 👈 TẠO KEY DUY NHẤT THEO MÀU + SIZE
-    const existing = acc.find(item => `${item.colorTitle}-${item.size}` === key);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      acc.push({ colorTitle, size: size || '', quantity, color }); // 👈 THÊM SIZE
-    }
-    return acc;
-  }, []);
-
-  // 7. Kết hợp kết quả nhập, xuất và chuyển kho THEO MÀU + SIZE
-  const combinedResult = importResult.map(importItem => {
-    const key = `${importItem.colorTitle}-${importItem.size}`;
-    
-    const exportItem = exportResult.find(exportItem => 
-      `${exportItem.colorTitle}-${exportItem.size}` === key
-    ) || { colorTitle: importItem.colorTitle, size: importItem.size, quantity: 0 };
-    
-    const transferItem = transferResult.find(transferItem => 
-      `${transferItem.colorTitle}-${transferItem.size}` === key
-    ) || { colorTitle: importItem.colorTitle, size: importItem.size, quantity: 0 };
-
-    const exportedAndTransferredQuantity = exportItem.quantity + transferItem.quantity;
-
-    return {
-      color: importItem.color,
-      colorTitle: importItem.colorTitle,
-      size: importItem.size, // 👈 THÊM SIZE VÀO KẾT QUẢ
-      importedQuantity: importItem.quantity,
-      exportedAndTransferredQuantity,
-      remainingQuantity: importItem.quantity - exportedAndTransferredQuantity,
-    };
-  });
-
-  // 8. Tính tổng số lượng nhập
-  const totalQuantity = combinedResult.reduce((sum, { importedQuantity }) => sum + importedQuantity, 0);
-
-  return {
-    success: true,
-    message: combinedResult.length > 0 ? 'Lấy danh sách màu và số lượng thành công' : 'Không có chi tiết màu nào cho sản phẩm này',
-    data: combinedResult,
-    totalQuantity,
-  };
-}
 
   async calculateStock(id: number) {
     // 1. Tính tổng số lượng nhập (chỉ tính import.status = 'COMPLETED')
@@ -684,46 +459,6 @@ async findColorQuantityByProductId(productId: number): Promise<{
     return productColors;
   }
 
-  async findProductsOverExported() {
-    const products = await this.prisma.product.findMany({
-      select: {
-        id: true,
-        title: true,
-        sku: true,
-        price: true,
-        discount: true,
-        colors: true,
-      },
-    });
-
-    const overExportedProducts = (await Promise.all(
-      products.map(async (product) => {
-        const stockInfo = await this.findColorQuantityByProductId(product.id);
-
-        const negativeStockColors = stockInfo.data.filter(
-          (item) => item.remainingQuantity < 0
-        );
-
-        if (negativeStockColors.length > 0) {
-          return {
-            ...product,
-            negativeStockColors,
-            totalRemaining: stockInfo.data.reduce((sum, c) => sum + c.remainingQuantity, 0),
-          };
-        }
-
-        return null;
-      })
-    )).filter((product) => product !== null);
-
-    return {
-      success: true,
-      message: overExportedProducts.length > 0
-        ? 'Danh sách sản phẩm bị xuất vượt tồn kho'
-        : 'Không có sản phẩm nào bị âm tồn kho',
-      data: overExportedProducts,
-    };
-}
 
 
 async importProducts(file: Express.Multer.File) {
