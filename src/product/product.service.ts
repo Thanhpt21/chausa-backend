@@ -297,15 +297,12 @@ async create(
       whereClause.categoryId = Number(categoryId);
     }
 
-    const orderByClause: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
-
-    // Lấy danh sách sản phẩm và tổng số sản phẩm trong 1 transaction
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where: whereClause,
         skip,
         take: limit,
-        orderBy: orderByClause,
+        orderBy: { createdAt: 'desc' },
         include: {
           category: {
             select: {
@@ -315,39 +312,15 @@ async create(
               parentId: true,
             },
           },
-          colors: {
-            select: {
-              colorId: true,
-              quantity: true,
-            },
-          },
         },
       }),
       this.prisma.product.count({ where: whereClause }),
     ]);
 
-    // Lấy tồn kho chi tiết theo màu và tồn kho tổng cho từng sản phẩm
-    const productsWithStock = await Promise.all(
-      products.map(async (product) => {
-        const stockByColorInfo = await this.findColorQuantityByProductId(product.id);
-        const stockTotalInfo = await this.calculateStock(product.id);
-
-        return {
-          ...product,
-          stockByColor: stockByColorInfo.data, // tồn kho chi tiết theo màu
-          stock: {
-            totalImported: stockTotalInfo.data.totalImported,
-            totalExported: stockTotalInfo.data.totalExportedAndTransferred,
-            remainingQuantity: stockTotalInfo.data.remainingQuantity,
-          },
-        };
-      })
-    );
-
     return {
       success: true,
       message: total > 0 ? 'Products found successfully' : 'No products found',
-      data: productsWithStock,
+      data: products, // Không cần transform thêm
       total,
       page,
       pageCount: Math.ceil(total / limit),
