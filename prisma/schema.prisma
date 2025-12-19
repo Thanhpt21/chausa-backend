@@ -81,6 +81,7 @@ model Product {
   colors                ProductColor[]
   purchaseRequestDetail PurchaseRequestDetail[]
   transferDetail        TransferDetail[]
+  transferOrderDetails TransferOrderDetail[]
   comboProducts         ComboProduct[]
 }
 
@@ -306,6 +307,7 @@ model Transfer {
   customer        Customer         @relation(fields: [customerId], references: [id])
   user            User             @relation(fields: [userId], references: [id])
   transferDetails TransferDetail[]
+  transferOrderDetails TransferOrderDetail[]
 
   @@index([userId])
   @@index([customerId])
@@ -327,6 +329,26 @@ model TransferDetail {
   updatedAt  DateTime @updatedAt
   product    Product  @relation(fields: [productId], references: [id])
   transfer   Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@index([productId])
+}
+
+model TransferOrderDetail {
+  id         Int      @id @default(autoincrement())
+  transferId Int      // liên kết với Transfer
+  productId  Int      // sản phẩm được đặt
+  quantity   Int      // số lượng khách đặt
+  color      Int
+  colorTitle String
+  size       String?
+  unit       String?  @default("cái")
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  transfer   Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
 
   @@index([transferId])
   @@index([productId])

@@ -32,6 +32,7 @@ import { ComboModule } from './combo/combo.module';
 import { ProductComboModule } from './product-combo/product-combo.module';
 import { EmployeeModule } from './employee/employee.module';
 import { SalaryModule } from './salary/salary.module';
+import { TransferOrderDetailModule } from './transfer-order-detail/transfer-order-detail.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { SalaryModule } from './salary/salary.module';
     WarehouseModule,
     TransferModule,
     TransferDetailModule,
+    TransferOrderDetailModule,
     PurchaseRequestModule,
     PurchaseRequestDetailModule,
     ProjectCategoryModule,
