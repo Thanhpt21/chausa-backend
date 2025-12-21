@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateTransferOrderDetailDto {
   @IsInt()
@@ -27,4 +27,11 @@ export class CreateTransferOrderDetailDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsNumber()
+  unitPrice: number;
+
+  @IsNumber()
+  @IsOptional()
+  finalPrice?: number;
 }

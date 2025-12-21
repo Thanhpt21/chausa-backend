@@ -11,11 +11,24 @@ export class TransferOrderDetailService {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException('Không tìm thấy sản phẩm');
 
-    const created = await this.prisma.transferOrderDetail.create({ data: dto });
+    const created = await this.prisma.transferOrderDetail.create({
+      data: {
+        transferId: dto.transferId,
+        productId: dto.productId,
+        quantity: dto.quantity,
+        unitPrice: dto.unitPrice,
+        note: dto.note,
+        color: dto.color,
+        colorTitle: dto.colorTitle,
+        size: dto.size,
+        finalPrice: dto.finalPrice ?? dto.quantity * dto.unitPrice,
+        unit: dto.unit
+      },
+    });
 
     return {
       success: true,
-      message: 'Tạo chi tiết đơn đặt thành công',
+      message: 'Tạo chi tiết phiếu điều chuyển thành công.',
       data: created,
     };
   }
@@ -30,10 +43,22 @@ export class TransferOrderDetailService {
     const existing = await this.prisma.transferOrderDetail.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Không tìm thấy chi tiết đơn đặt');
 
-    const updated = await this.prisma.transferOrderDetail.update({
+    const updated = await this.prisma.transferDetail.update({
       where: { id },
-      data: { ...dto },
+      data: {
+        transferId: dto.transferId ?? existing.transferId,
+        productId: dto.productId ?? existing.productId,
+        quantity: dto.quantity ?? existing.quantity,
+        unitPrice: dto.unitPrice ?? existing.unitPrice,
+        note: dto.note ?? existing.note,
+        color: dto.color ?? existing.color,
+        colorTitle: dto.colorTitle ?? existing.colorTitle,
+        size: dto.size ?? existing.size, 
+        finalPrice: dto.finalPrice ?? existing.finalPrice,
+        unit: dto.unit ?? existing.unit
+      },
     });
+
 
     return { success: true, message: 'Cập nhật chi tiết đơn đặt thành công', data: updated };
   }

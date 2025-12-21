@@ -339,11 +339,14 @@ model TransferOrderDetail {
   transferId Int      // liên kết với Transfer
   productId  Int      // sản phẩm được đặt
   quantity   Int      // số lượng khách đặt
+  unitPrice  Float
+  note       String?
   color      Int
   colorTitle String
   size       String?
   unit       String?  @default("cái")
-  note       String?
+  finalPrice Float?
+
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
